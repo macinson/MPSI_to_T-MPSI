@@ -17,6 +17,7 @@ add_library(BloomFilter bloom_filter.h bloom_filter.cpp)
 add_library(PSIProtocols psi_protocols.h psi_protocols.cpp)
 add_library(SubProtocols sub_protocols.h sub_protocols.cpp)
 add_library(Benchmarking benchmarking.h benchmarking.cpp)
+add_library(SRA sra.h sra.cpp)
 
 # Bundle everything together
 add_executable(multiparty_psi_fresh main.cpp)
@@ -28,5 +29,6 @@ target_link_libraries(multiparty_psi_fresh
         BloomFilter
         MurmurHash3
         ThresholdPaillier
+        SRA
         ${NTL_LIBRARY}
         ${GMP_LIBRARIES})
