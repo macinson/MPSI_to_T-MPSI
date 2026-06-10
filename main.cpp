@@ -71,5 +71,39 @@ int main() {
         threshold_benchmark(std::vector<long>({5, 15, 25, 35}), std::vector<long>({2, 4, 5}));
     }
 
+    std::cout << "Running MPSI to OT-MPSI" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+    std::vector<std::pair<long,long>> OTresult = mpsi_to_over_threshold_multiparty_psi(std::vector({client1_set, client2_set}), server_set,
+                                                            2,
+                                                            16, 4,
+                                                            1,
+                                                            keys);
+    stop = std::chrono::high_resolution_clock::now();
+
+
+    std::cout << "The resulting over-threshold set intersection was: { ";
+    for (auto element : OTresult) {
+        std::cout << "{" << element.first << ": " << element.second << "}" << " ";
+    }
+    std::cout << "}." << std::endl << std::endl;
+    std::cout << "Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << " ms."
+              << std::endl << std::endl;
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "Run benchmarks for OT-MPSI for T=t-1 (y/n): ";
+
+    if (std::cin.get() == 'y') {
+        std::cout << "Running benchmarks (without simulated delays) using a 1024-bit key:" << std::endl;
+        ot_mpsi_benchmarkm1(std::vector<long>({5,10,15,20,25,30,35,40,45,50}), std::vector<long>({2, 4, 5}));
+    }
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "Run benchmarks for OT-MPSI for T=t/2 (y/n): ";
+
+    if (std::cin.get() == 'y') {
+        std::cout << "Running benchmarks (without simulated delays) using a 1024-bit key:" << std::endl;
+        ot_mpsi_benchmark2(std::vector<long>({5,6,7,8,9,10}), std::vector<long>({2, 4, 5}));
+    }
+
     return 0;
 }

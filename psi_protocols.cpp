@@ -3,6 +3,12 @@
 //
 #include <thread>
 #include <future>
+#include <algorithm>
+#include <unordered_set>
+#include <numeric>
+#include <random>
+#include <unordered_map>
+#include "sra.h"
 #include "psi_protocols.h"
 
 template <class T>
@@ -97,6 +103,161 @@ std::vector<long> multiparty_psi(std::vector<std::vector<long>> client_sets,
     eibf_futures.reserve(client_sets.size());
     for (auto & client_set : client_sets) {
         eibf_futures.push_back(std::async(std::launch::async, generate_eibf, std::ref(client_set), m_bits, k_hashes, std::ref(keys)));
+    }
+
+    // Wait till the processing is done
+    await_futures(eibf_futures);
+
+    // Extract the generated EIBFs from the clients
+    std::vector<std::vector<ZZ>> client_eibfs;
+    client_eibfs.reserve(client_sets.size());
+    for (std::future<std::vector<ZZ>> &future : eibf_futures) {
+        client_eibfs.push_back(future.get());
+    }
+
+    // 4. Send the encrypted Bloom filters to the server
+    // TODO: Implement sending
+
+
+    /// Set Intersection Computation
+    // 1-2. Use the k hashes to select elements from the EIBFs and sum them up homomorphically,
+    //      rerandomize afterwards.
+    std::vector<ZZ> ciphertexts;
+    ciphertexts.reserve(server_set.size());
+    for (long element : server_set) {
+        // Compute for the first hash function
+        unsigned long index = BloomFilter::hash(element, 0) % m_bits;
+        ZZ ciphertext = client_eibfs.at(0).at(index);
+        for (int i = 1; i < client_eibfs.size(); ++i) {
+            // From client i add the bit at index from their EIBF
+            ciphertext = add_homomorphically(ciphertext, client_eibfs.at(i).at(index), keys.public_key);
+        }
+
+        // Compute for the remaining hash functions
+        for (int i = 1; i < k_hashes; ++i) {
+            index = BloomFilter::hash(element, i) % m_bits;
+
+            // Sum up all selected ciphertexts
+            for (std::vector<ZZ> eibf : client_eibfs) {
+                ciphertext = add_homomorphically(ciphertext, eibf.at(index), keys.public_key);
+            }
+        }
+
+        // Rerandomize the ciphertext to prevent analysis due to the deterministic nature of homomorphic addition
+        ciphertext = rerandomize(ciphertext, keys.public_key);
+
+        ciphertexts.push_back(ciphertext);
+    }
+
+    // 3. The ciphertexts get sent to l parties
+    // TODO: Send to clients (look into threshold)
+
+    // 4. Decrypt-to-zero each ciphertext in collaboration with the clients
+    std::vector<std::future<std::vector<ZZ>>> randomization_futures;
+    randomization_futures.reserve(client_sets.size());
+    for (int i = 0; i < client_sets.size(); ++i) {
+        randomization_futures.push_back(std::async(std::launch::async, randomize_ciphertexts, ciphertexts, std::ref(keys)));
+    }
+
+    // Wait till the processing is done
+    await_futures(randomization_futures);
+
+    // Extract the randomized ciphertexts from the clients
+    std::vector<std::vector<ZZ>> client_ciphertexts;
+    client_ciphertexts.reserve(client_sets.size());
+    for (std::future<std::vector<ZZ>> &future : randomization_futures) {
+        client_ciphertexts.push_back(future.get());
+    }
+
+    // Sum up all clients' randomized ciphertexts
+    std::vector<ZZ> randomized_ciphertexts = client_ciphertexts.at(0);
+    for (int i = 1; i < client_ciphertexts.size(); ++i) {
+        for (int j = 0; j < ciphertexts.size(); ++j) {
+            randomized_ciphertexts.at(j) = add_homomorphically(randomized_ciphertexts.at(j), client_ciphertexts.at(i).at(j), keys.public_key);
+        }
+    }
+
+    // Partial decryption (let threshold + 1 parties decrypt)
+    std::vector<std::future<std::vector<std::pair<long, ZZ>>>> decryption_share_futures;
+    decryption_share_futures.reserve(threshold_l + 1);
+    for (int i = 0; i < (threshold_l + 1); ++i) {
+        decryption_share_futures.push_back(std::async(std::launch::async, compute_decryption_shares, randomized_ciphertexts, i, std::ref(keys)));
+    }
+
+    // Wait till the processing is done
+    await_futures(decryption_share_futures);
+
+    // Extract the decryption shares from the clients
+    std::vector<std::vector<std::pair<long, ZZ>>> client_decryption_shares;
+    client_decryption_shares.reserve(threshold_l + 1);
+    for (std::future<std::vector<std::pair<long, ZZ>>> &future : decryption_share_futures) {
+        client_decryption_shares.push_back(future.get());
+    }
+
+    // 5. Run the combining algorithm
+    std::vector<ZZ> decryptions;
+    decryptions.reserve(ciphertexts.size());
+
+    for (int i = 0; i < ciphertexts.size(); ++i) {
+        std::vector<std::pair<long, ZZ>> ciphertext_decryption_shares;
+        ciphertext_decryption_shares.reserve(client_decryption_shares.size());
+
+        for (auto & client_decryption_share : client_decryption_shares) {
+            ciphertext_decryption_shares.push_back(client_decryption_share.at(i));
+        }
+
+        decryptions.push_back(combine_partial_decrypt(ciphertext_decryption_shares, keys.public_key));
+    }
+
+    // 6. Output the final intersection by selecting the elements from the server set that correspond to a decryption of zero
+    std::vector<long> intersection;
+    for (int i = 0; i < server_set.size(); ++i) {
+        if (decryptions.at(i) == 0) {
+            intersection.push_back(server_set.at(i));
+        }
+    }
+
+    return intersection;
+}
+
+std::vector<ZZ> participant_hiding_generate_eibf(std::vector<long> &client_set, long m_bits, long k_hashes, Keys &keys, bool actual) {
+    BloomFilter bloom_filter(m_bits, k_hashes);
+
+    
+    // Check if it should be a dummy or not
+    if(actual){
+        // Step 1
+        for (long element : client_set) {
+            bloom_filter.insert(element);
+        }
+        // Step 2
+        bloom_filter.invert();
+    }
+    // Step 3
+    std::vector<ZZ> eibf;
+    bloom_filter.encrypt_all(eibf, keys.public_key);
+
+    return eibf;
+}
+
+std::vector<long> participant_hiding_multiparty_psi(std::vector<std::pair<std::vector<long>, bool>> client_sets,
+                                 std::vector<long> server_set,
+                                 long threshold_l,
+                                 long m_bits, long k_hashes,
+                                 Keys &keys) {
+    //// MPSI protocol
+
+    /// Initialization
+    // TODO: Send?
+
+
+    /// Local EIBF generation
+
+    // 1-3. Clients compute their Bloom filter, invert it and encrypt it (generating EIBFs)
+    std::vector<std::future<std::vector<ZZ>>> eibf_futures;
+    eibf_futures.reserve(client_sets.size());
+    for (auto & [client_set, actual] : client_sets) {
+        eibf_futures.push_back(std::async(std::launch::async, participant_hiding_generate_eibf, std::ref(client_set), m_bits, k_hashes, std::ref(keys), actual));
     }
 
     // Wait till the processing is done
@@ -382,4 +543,104 @@ std::vector<long> threshold_multiparty_psi(std::vector<std::vector<long>> client
     }
 
     return intersection;
+}
+
+std::unordered_map<long,long> generate_binomials(long n, long k){
+    if(n < k) return {};
+    std::unordered_map<long,long> res {};
+    res[1] = k;
+    long prev = 1;
+    for(long i = k+1; i <= n; i++){
+        prev *= n/(n-k);
+        res[prev] = i;
+    }
+    return res;
+}
+
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::vector<std::vector<long>> sets,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys){
+
+    
+    std::vector<std::vector<long>> client_sets;
+    client_sets.reserve(sets.size() - 1);
+    for (int i = 0; i < sets.size() - 1; ++i) {
+        client_sets.push_back(sets.at(i));
+    }
+
+    std::vector<long> server_set = sets.at(sets.size() - 1);
+
+    return mpsi_to_over_threshold_multiparty_psi(client_sets, server_set, threshold_l, m_bits, k_hashes, intersection_threshold_T, keys);
+}
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::vector<std::vector<long>> client_sets,
+                                          std::vector<long> server_set,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys) {
+
+    // std::vector<std::vector<bool>> subsets = generate_subsets(client_sets.size(), intersection_threshold_T);
+    if (intersection_threshold_T > client_sets.size() || intersection_threshold_T < 0) return {};
+    std::vector<ZZ> subsetMap(client_sets.size());
+    std::iota(subsetMap.begin(), subsetMap.end(),ZZ(0));
+    //mental poker game to deal the columns
+    std::vector<std::future<SRA>> sra_futures {};
+    sra_futures.reserve(client_sets.size());
+    for (int i = 0; i < client_sets.size(); ++i) {
+        sra_futures.push_back(std::async(std::launch::async, generate_sra_key, ZZ(65537)));
+    }
+
+    await_futures(sra_futures);
+
+    std::vector<SRA> sras {};
+    for (auto & f : sra_futures) {
+        sras.push_back(f.get());
+    }
+    
+    //Simulate each party shuffling the "deck"
+    for(auto & s : sras){
+        for(int i = 0; i < subsetMap.size(); i++){
+            subsetMap[i] = encrypt_sra(s, subsetMap[i]);
+        }
+        std::shuffle(subsetMap.begin(), subsetMap.end(), std::mt19937{std::random_device{}()});
+    }
+
+    //Parties "deal" the cards
+    //Normally, each party would decrypt all cards not belonging to them first
+    //Then after each party would do so, each party would receive one card encrypted with their key only
+    //Each party would then decrypt their card to know it
+    //
+    //Here, parties just decrypt everything right away for simplicity
+    for(auto & s : sras){
+        for(int i = 0; i < subsetMap.size(); i++){
+            subsetMap[i] = decrypt_sra(s, subsetMap[i]);
+        }
+    }
+
+    std::unordered_set<long> result_set {};
+    std::unordered_map<long,long> count_map {};
+    std::vector<bool> currSubset(client_sets.size(), false);
+    std::fill(currSubset.end() - intersection_threshold_T, currSubset.end(), true);
+    do {
+        std::vector<std::pair<std::vector<long>, bool>> paired {};
+        paired.reserve(client_sets.size());
+        for(size_t i = 0; i < client_sets.size(); i++){
+            paired.push_back({client_sets.at(i),currSubset.at(conv<size_t>(subsetMap[i]))});
+        }
+
+        std::vector<long> curr = participant_hiding_multiparty_psi(paired, server_set, threshold_l, m_bits, k_hashes,keys);
+        for(auto i : curr) {
+            result_set.insert(i);
+            count_map[i]++;
+        }
+    } while(std::next_permutation(currSubset.begin(), currSubset.end()));
+
+    std::unordered_map<long,long> binomial_lookup = generate_binomials(client_sets.size(), intersection_threshold_T);
+    std::vector<std::pair<long,long>> result {};
+    for(long i : result_set){
+        result.push_back({i, binomial_lookup[count_map[i]] + 1});
+    }
+    return result;
 }

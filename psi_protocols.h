@@ -19,6 +19,12 @@ std::vector<long> multiparty_psi(std::vector<std::vector<long>> sets,
                                  long threshold_l,
                                  long m_bits, long k_hashes,
                                  Keys &keys);
+                                
+std::vector<long> participant_hiding_multiparty_psi(std::vector<std::pair<std::vector<long>, bool>> client_sets,
+                                 std::vector<long> server_set,
+                                 long threshold_l,
+                                 long m_bits, long k_hashes,
+                                 Keys &keys);                              
 
 std::vector<long> threshold_multiparty_psi(std::vector<std::vector<long>> sets,
                                            long threshold_l,
@@ -31,4 +37,14 @@ std::vector<long> threshold_multiparty_psi(std::vector<std::vector<long>> client
                                            long threshold_l,
                                            long m_bits, long k_hashes,
                                            long intersection_threshold_T, Keys& keys);
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::vector<std::vector<long>> sets,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys);
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::vector<std::vector<long>> client_sets,
+                                          std::vector<long> server_set,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys);
 #endif //PSI_PROTOCOLS_H
