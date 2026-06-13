@@ -644,3 +644,55 @@ std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::ve
     }
     return result;
 }
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi_no_dummies(std::vector<std::vector<long>> sets,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys){
+
+    
+    std::vector<std::vector<long>> client_sets;
+    client_sets.reserve(sets.size() - 1);
+    for (int i = 0; i < sets.size() - 1; ++i) {
+        client_sets.push_back(sets.at(i));
+    }
+
+    std::vector<long> server_set = sets.at(sets.size() - 1);
+
+    return mpsi_to_over_threshold_multiparty_psi_no_dummies(client_sets, server_set, threshold_l, m_bits, k_hashes, intersection_threshold_T, keys);
+}
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi_no_dummies(std::vector<std::vector<long>> client_sets,
+                                          std::vector<long> server_set,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys) {
+
+    // std::vector<std::vector<bool>> subsets = generate_subsets(client_sets.size(), intersection_threshold_T);
+    if (intersection_threshold_T > client_sets.size() || intersection_threshold_T < 0) return {};
+
+    std::unordered_set<long> result_set {};
+    std::unordered_map<long,long> count_map {};
+    std::vector<bool> curr_subset(client_sets.size(), false);
+    std::fill(curr_subset.end() - intersection_threshold_T, curr_subset.end(), true);
+    do {
+        std::vector<std::vector<long>> curr_parties {};
+        curr_parties.reserve(intersection_threshold_T);
+        for(size_t i = 0; i < client_sets.size(); i++){
+            if(curr_subset.at(i)) curr_parties.push_back(client_sets.at(i));
+        }
+
+        std::vector<long> curr = multiparty_psi(curr_parties, server_set, threshold_l, m_bits, k_hashes,keys);
+        for(auto i : curr) {
+            result_set.insert(i);
+            count_map[i]++;
+        }
+    } while(std::next_permutation(curr_subset.begin(), curr_subset.end()));
+
+    std::unordered_map<long,long> binomial_lookup = generate_binomials(client_sets.size(), intersection_threshold_T);
+    std::vector<std::pair<long,long>> result {};
+    for(long i : result_set){
+        result.push_back({i, binomial_lookup[count_map[i]] + 1});
+    }
+    return result;
+}

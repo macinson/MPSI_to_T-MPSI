@@ -105,5 +105,21 @@ int main() {
         ot_mpsi_benchmark2(std::vector<long>({5,6,7,8,9,10}), std::vector<long>({2, 4, 5}));
     }
 
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "Run benchmarks for OT-MPSI with no dummies and mental poker for T=t-1 (y/n): ";
+
+    if (std::cin.get() == 'y') {
+        std::cout << "Running benchmarks (without simulated delays) using a 1024-bit key:" << std::endl;
+        ot_mpsi_benchmarkm1_no_dummies(std::vector<long>({5,10,15,20,25,30,35,40,45,50}), std::vector<long>({2, 4, 5}));
+    }
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "Run benchmarks for OT-MPSI for T=t/2 with no dummies and mental poker (y/n): ";
+
+    if (std::cin.get() == 'y') {
+        std::cout << "Running benchmarks (without simulated delays) using a 1024-bit key:" << std::endl;
+        ot_mpsi_benchmark2_no_dummies(std::vector<long>({5,6,7,8,9,10}), std::vector<long>({2, 4, 5}));
+    }
+
     return 0;
 }

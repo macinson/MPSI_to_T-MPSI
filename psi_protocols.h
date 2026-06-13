@@ -47,4 +47,15 @@ std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi(std::ve
                                           long threshold_l,
                                           long m_bits, long k_hashes,
                                           long intersection_threshold_T, Keys& keys);
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi_no_dummies(std::vector<std::vector<long>> sets,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys);
+
+std::vector<std::pair<long, long>> mpsi_to_over_threshold_multiparty_psi_no_dummies(std::vector<std::vector<long>> client_sets,
+                                          std::vector<long> server_set,
+                                          long threshold_l,
+                                          long m_bits, long k_hashes,
+                                          long intersection_threshold_T, Keys& keys);
 #endif //PSI_PROTOCOLS_H

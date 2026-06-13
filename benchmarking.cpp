@@ -305,6 +305,76 @@ void ot_mpsi_benchmarkm1(std::vector<long> parties_t, std::vector<long> set_size
     }
 }
 
+void ot_mpsi_benchmarkm1_no_dummies(std::vector<long> parties_t, std::vector<long> set_size_exponents) {
+    // Pre-generate all keys
+    std::vector<std::pair<Keys, Keys>> keys;
+    keys.reserve(parties_t.size());
+    for (long t : parties_t) {
+        Keys k_1;
+        key_gen(&k_1, 1024, t/2, t);
+
+        Keys k_tm1;
+        key_gen(&k_tm1, 1024, t-1, t);
+
+        keys.emplace_back(k_1, k_tm1);
+    }
+    // -> Normally, the keys would be distributed to the parties now
+
+    // Run the experiments
+    for (int t_i = 0; t_i < parties_t.size(); ++t_i) {
+        std::cout << "time_" << parties_t.at(t_i) << "_parties = process([";
+
+        for (long exp : set_size_exponents) {
+            // Generate sets for each experiment
+            std::vector<std::vector<std::vector<long>>> experiment_sets;
+            for (int i = 0; i < 10; ++i) {
+                std::vector<std::vector<long>> client_sets;
+                // Generate a set for each client
+                for (int j = 0; j < parties_t.at(t_i); ++j) {
+                    std::vector<long> set;
+                    set.reserve(1 << exp);
+                    for (unsigned long k = 0; k < (1 << exp); ++k) {
+                        // TODO: User random long instead of int
+                        set.push_back(rand());
+                    }
+                    client_sets.push_back(set);
+                }
+                experiment_sets.push_back(client_sets);
+            }
+
+            // Use epsilon = 2^-7, which gives less than 1% false positive rate
+            long m_bits = ceil((7.0 * (1 << exp)) / log(2.0));
+            long k_hashes = 7;
+
+            // Run each experiment 10 times
+            std::vector<double> means_t2;
+            std::vector<double> std_t2;
+            std::vector<double> means_tm1;
+            std::vector<double> std_tm1;
+
+            // threshold T = t/2
+            std::vector<long> times;
+
+            // threshold  T = t - 1
+
+            for (int i = 0; i < 10; ++i) {
+                auto start = std::chrono::high_resolution_clock::now();
+                mpsi_to_over_threshold_multiparty_psi_no_dummies(experiment_sets.at(i), parties_t.at(t_i) - 1, m_bits, k_hashes,
+                                         experiment_sets.at(0).size() - 1, keys.at(t_i).second);
+                auto stop = std::chrono::high_resolution_clock::now();
+
+                times.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count());
+            }
+
+            double mean2 = sample_mean(times);
+            double std2 = sample_std(times, mean2);
+            std::cout << "(" << mean2 << ", " << std2 << "), ";
+        }
+
+        std::cout << "])" << std::endl;
+    }
+}
+
 void ot_mpsi_benchmark2(std::vector<long> parties_t, std::vector<long> set_size_exponents) {
     // Pre-generate all keys
     std::vector<std::pair<Keys, Keys>> keys;
@@ -367,6 +437,76 @@ void ot_mpsi_benchmark2(std::vector<long> parties_t, std::vector<long> set_size_
             double mean1 = sample_mean(times);
             double std1 = sample_std(times, mean1);
             std::cout << "(" << mean1 << ", " << std1  << "), ";
+        }
+
+        std::cout << "])" << std::endl;
+    }
+}
+
+void ot_mpsi_benchmark2_no_dummies(std::vector<long> parties_t, std::vector<long> set_size_exponents) {
+    // Pre-generate all keys
+    std::vector<std::pair<Keys, Keys>> keys;
+    keys.reserve(parties_t.size());
+    for (long t : parties_t) {
+        Keys k_1;
+        key_gen(&k_1, 1024, t/2, t);
+
+        Keys k_tm1;
+        key_gen(&k_tm1, 1024, t-1, t);
+
+        keys.emplace_back(k_1, k_tm1);
+    }
+    // -> Normally, the keys would be distributed to the parties now
+
+    // Run the experiments
+    for (int t_i = 0; t_i < parties_t.size(); ++t_i) {
+        std::cout << "time_" << parties_t.at(t_i) << "_parties = process([";
+
+        for (long exp : set_size_exponents) {
+            // Generate sets for each experiment
+            std::vector<std::vector<std::vector<long>>> experiment_sets;
+            for (int i = 0; i < 10; ++i) {
+                std::vector<std::vector<long>> client_sets;
+                // Generate a set for each client
+                for (int j = 0; j < parties_t.at(t_i); ++j) {
+                    std::vector<long> set;
+                    set.reserve(1 << exp);
+                    for (unsigned long k = 0; k < (1 << exp); ++k) {
+                        // TODO: User random long instead of int
+                        set.push_back(rand());
+                    }
+                    client_sets.push_back(set);
+                }
+                experiment_sets.push_back(client_sets);
+            }
+
+            // Use epsilon = 2^-7, which gives less than 1% false positive rate
+            long m_bits = ceil((7.0 * (1 << exp)) / log(2.0));
+            long k_hashes = 7;
+
+            // Run each experiment 10 times
+            std::vector<double> means_t2;
+            std::vector<double> std_t2;
+            std::vector<double> means_tm1;
+            std::vector<double> std_tm1;
+
+            // threshold T = t/2
+            std::vector<long> times;
+
+            // threshold  T = t/2
+
+            for (int i = 0; i < 10; ++i) {
+                auto start = std::chrono::high_resolution_clock::now();
+                mpsi_to_over_threshold_multiparty_psi_no_dummies(experiment_sets.at(i), parties_t.at(t_i) - 1, m_bits, k_hashes,
+                                         experiment_sets.at(0).size()/2, keys.at(t_i).second);
+                auto stop = std::chrono::high_resolution_clock::now();
+
+                times.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count());
+            }
+
+            double mean2 = sample_mean(times);
+            double std2 = sample_std(times, mean2);
+            std::cout << "(" << mean2 << ", " << std2 << "), ";
         }
 
         std::cout << "])" << std::endl;

@@ -10,6 +10,8 @@
 void benchmark(std::vector<long> parties_t, std::vector<long> set_size_exponents);
 void threshold_benchmark(std::vector<long> parties_t, std::vector<long> set_size_exponents);
 void ot_mpsi_benchmarkm1(std::vector<long> parties_t, std::vector<long> set_size_exponents);
+void ot_mpsi_benchmarkm1_no_dummies(std::vector<long> parties_t, std::vector<long> set_size_exponents);
 void ot_mpsi_benchmark2(std::vector<long> parties_t, std::vector<long> set_size_exponents);
+void ot_mpsi_benchmark2_no_dummies(std::vector<long> parties_t, std::vector<long> set_size_exponents);
 
 #endif //BENCHMARKING_H
