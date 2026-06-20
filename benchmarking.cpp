@@ -257,7 +257,7 @@ void ot_mpsi_benchmarkm1(std::vector<long> parties_t, std::vector<long> set_size
         for (long exp : set_size_exponents) {
             // Generate sets for each experiment
             std::vector<std::vector<std::vector<long>>> experiment_sets;
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 20; ++i) {
                 std::vector<std::vector<long>> client_sets;
                 // Generate a set for each client
                 for (int j = 0; j < parties_t.at(t_i); ++j) {
@@ -287,7 +287,7 @@ void ot_mpsi_benchmarkm1(std::vector<long> parties_t, std::vector<long> set_size
 
             // threshold  T = t - 1
 
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 20; ++i) {
                 auto start = std::chrono::high_resolution_clock::now();
                 mpsi_to_over_threshold_multiparty_psi(experiment_sets.at(i), parties_t.at(t_i) - 1, m_bits, k_hashes,
                                          experiment_sets.at(0).size() - 1, keys.at(t_i).second);
@@ -327,7 +327,7 @@ void ot_mpsi_benchmarkm1_no_dummies(std::vector<long> parties_t, std::vector<lon
         for (long exp : set_size_exponents) {
             // Generate sets for each experiment
             std::vector<std::vector<std::vector<long>>> experiment_sets;
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 20; ++i) {
                 std::vector<std::vector<long>> client_sets;
                 // Generate a set for each client
                 for (int j = 0; j < parties_t.at(t_i); ++j) {
@@ -357,7 +357,7 @@ void ot_mpsi_benchmarkm1_no_dummies(std::vector<long> parties_t, std::vector<lon
 
             // threshold  T = t - 1
 
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 20; ++i) {
                 auto start = std::chrono::high_resolution_clock::now();
                 mpsi_to_over_threshold_multiparty_psi_no_dummies(experiment_sets.at(i), parties_t.at(t_i) - 1, m_bits, k_hashes,
                                          experiment_sets.at(0).size() - 1, keys.at(t_i).second);
